@@ -25,6 +25,7 @@ SMTP_USERNAME = os.getenv("SMTP_USERNAME")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 TU_EMAIL = os.getenv("TU_EMAIL")
 
+
 def send_email(to_email: str, subject: str, body: str):
     msg = MIMEMultipart()
     msg["From"] = SMTP_USERNAME
@@ -38,6 +39,7 @@ def send_email(to_email: str, subject: str, body: str):
         server.login(SMTP_USERNAME, SMTP_PASSWORD)
         server.send_message(msg)
 
+
 @app.post("/contact")
 async def contact(request: Request):
     data = await request.json()
@@ -47,34 +49,34 @@ async def contact(request: Request):
     subject = data.get("subject", "Consulta desde tu portafolio")
     lang = data.get("lang", "en").lower()
 
-    # --- Prepara el contenido del correo personal ---
+    server_subject = f"All-in Request - {subject}"
     if lang == "es":
-        personal_subject = subject
-        personal_message = f"Nuevo mensaje de {name} ({email}):\n\n{message}"
+        server_body = f"Nuevo mensaje de {name} ({email}):\n\n{message}"
     else:
-        personal_subject = subject
-        personal_message = f"New message from {name} ({email}):\n\n{message}"
+        server_body = f"New message from {name} ({email}):\n\n{message}"
 
-    # Envía a tu email
-    send_email(TU_EMAIL, personal_subject, personal_message)
+    send_email(TU_EMAIL, server_subject, server_body)
 
-    # --- Prepara la confirmación al usuario ---
     if lang == "es":
-        confirmation_subject = f"Confirmación de contacto: {subject}"
+        confirmation_subject = f"Mensaje recibido: {subject}"
         confirmation_body = (
             f"Hola {name},\n\n"
-            f"Hemos recibido tu mensaje sobre '{subject}':\n\n"
-            f"{message}\n\n"
-            "¡Gracias por contactar!"
+            "Hemos recibido tu mensaje:\n\n"
+            f"\"Asunto\": \"{subject}\"\n"
+            f"\"Mensaje\": \"{message}\"\n\n"
+            "¡En breve contactaremos con usted! - All-in"
         )
     else:
         confirmation_subject = f"Contact Confirmation: {subject}"
         confirmation_body = (
             f"Hi {name},\n\n"
-            f"We have received your message regarding '{subject}':\n\n"
-            f"{message}\n\n"
-            "Thank you for getting in touch."
+            "We have received your message:\n\n"
+            f"\"Subject\": \"{subject}\"\n"
+            f"\"Message\": \"{message}\"\n\n"
+            "We will contact you soon! - All-in"
         )
 
+    # Envía confirmación al usuario
     send_email(email, confirmation_subject, confirmation_body)
+
     return {"message": "Emails enviados correctamente"}
