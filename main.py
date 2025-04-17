@@ -1,12 +1,18 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# --- Logging básico ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -26,57 +32,67 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 TU_EMAIL = os.getenv("TU_EMAIL")
 
 
+class ContactRequest(BaseModel):
+    name: str
+    email: EmailStr
+    message: str
+    subject: str = "Consulta desde tu portafolio"
+    lang: str = "en"
+
+
 def send_email(to_email: str, subject: str, body: str):
+    """Envía un correo simple en texto plano."""
     msg = MIMEMultipart()
     msg["From"] = SMTP_USERNAME
     msg["To"] = to_email
     msg["Subject"] = subject
-
     msg.attach(MIMEText(body, "plain"))
 
-    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-        server.starttls()
-        server.login(SMTP_USERNAME, SMTP_PASSWORD)
-        server.send_message(msg)
+    try:
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()
+            server.login(SMTP_USERNAME, SMTP_PASSWORD)
+            server.send_message(msg)
+        logger.info(f"Email enviado a {to_email} con asunto '{subject}'")
+    except Exception as e:
+        logger.error(f"Error al enviar email a {to_email}: {e}")
+        # No propagamos la excepción para que el otro correo siga intentando enviarse.
 
 
 @app.post("/contact")
-async def contact(request: Request):
-    data = await request.json()
-    name = data.get("name")
-    email = data.get("email")
-    message = data.get("message")
-    subject = data.get("subject", "Consulta desde tu portafolio")
-    lang = data.get("lang", "en").lower()
-
-    server_subject = f"All-in Request - {subject}"
+async def contact(
+    payload: ContactRequest,
+    background_tasks: BackgroundTasks
+):
+    # Normalizamos idioma
+    lang = payload.lang.lower()
+    # Asunto para el correo que te llega a ti
+    server_subject = f"All-in Request - {payload.subject}"
+    # Body al servidor
     if lang == "es":
-        server_body = f"Nuevo mensaje de {name} ({email}):\n\n{message}"
-    else:
-        server_body = f"New message from {name} ({email}):\n\n{message}"
-
-    send_email(TU_EMAIL, server_subject, server_body)
-
-    if lang == "es":
-        confirmation_subject = f"Mensaje recibido: {subject}"
+        server_body = f"Nuevo mensaje de {payload.name} ({payload.email}):\n\n{payload.message}"
+        # Preparación del correo de confirmación
+        confirmation_subject = f"Mensaje recibido: {payload.subject}"
         confirmation_body = (
-            f"Hola {name},\n\n"
+            f"Hola {payload.name},\n\n"
             "Hemos recibido tu mensaje:\n\n"
-            f"\"Asunto\": \"{subject}\"\n"
-            f"\"Mensaje\": \"{message}\"\n\n"
-            "¡En breve contactaremos con usted! - All-in"
+            f"\"Asunto\": \"{payload.subject}\"\n"
+            f"\"Mensaje\": \"{payload.message}\"\n\n"
+            "¡En breve contactaremos contigo! - All-in"
         )
     else:
-        confirmation_subject = f"Contact Confirmation: {subject}"
+        server_body = f"New message from {payload.name} ({payload.email}):\n\n{payload.message}"
+        confirmation_subject = f"Contact Confirmation: {payload.subject}"
         confirmation_body = (
-            f"Hi {name},\n\n"
+            f"Hi {payload.name},\n\n"
             "We have received your message:\n\n"
-            f"\"Subject\": \"{subject}\"\n"
-            f"\"Message\": \"{message}\"\n\n"
+            f"\"Subject\": \"{payload.subject}\"\n"
+            f"\"Message\": \"{payload.message}\"\n\n"
             "We will contact you soon! - All-in"
         )
 
-    # Envía confirmación al usuario
-    send_email(email, confirmation_subject, confirmation_body)
+    # Enviamos ambos correos en background para no retrasar la respuesta
+    background_tasks.add_task(send_email, TU_EMAIL, server_subject, server_body)
+    background_tasks.add_task(send_email, payload.email, confirmation_subject, confirmation_body)
 
-    return {"message": "Emails enviados correctamente"}
+    return { "message": "Emails en proceso de envío" }
