@@ -1,4 +1,4 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import smtplib
@@ -10,14 +10,16 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# --- Logging básico ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+# CORS para conectar desde tu frontend en Vercel
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],  # Ajusta a tu dominio Vercel si lo deseas
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,40 +40,44 @@ class ContactRequest(BaseModel):
     lang: str = "en"
 
 
-def send_email(to_email: str, subject: str, body: str):
-    """Envía un correo simple en texto plano."""
+def _send_email_raw(to_email: str, subject: str, body: str):
+    """Base: dispara el SMTP y lanza la excepción si falla."""
     msg = MIMEMultipart()
     msg["From"] = SMTP_USERNAME
     msg["To"] = to_email
     msg["Subject"] = subject
     msg.attach(MIMEText(body, "plain"))
 
+    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        server.starttls()
+        server.login(SMTP_USERNAME, SMTP_PASSWORD)
+        server.send_message(msg)
+
+
+def send_email_background(to_email: str, subject: str, body: str):
+    """Para tareas en background: atrapa errores y los loggea."""
     try:
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.send_message(msg)
-        logger.info(f"Email enviado a {to_email} con asunto '{subject}'")
+        _send_email_raw(to_email, subject, body)
+        logger.info(f"[BG] Email enviado a {to_email} con asunto '{subject}'")
     except Exception as e:
-        logger.error(f"Error al enviar email a {to_email}: {e}")
+        logger.error(f"[BG] Error enviando a {to_email}: {e}")
 
 
 @app.post("/contact")
-async def contact(
-    payload: ContactRequest,
-    background_tasks: BackgroundTasks
-):
+async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
+    # Validación básica de email
     if "@" not in payload.email:
         raise HTTPException(status_code=400, detail="Email inválido")
 
     lang = payload.lang.lower()
-
+    # Asunto y cuerpo para tu bandeja
     server_subject = f"All-in Request - {payload.subject}"
     server_body = (
         f"{'Nuevo mensaje' if lang=='es' else 'New message'} de "
         f"{payload.name} ({payload.email}):\n\n{payload.message}"
     )
 
+    # Asunto y cuerpo para confirmación al cliente
     if lang == "es":
         confirmation_subject = f"Mensaje recibido: {payload.subject}"
         confirmation_body = (
@@ -91,7 +97,23 @@ async def contact(
             "We will contact you soon! - All-in"
         )
 
-    background_tasks.add_task(send_email, TU_EMAIL, server_subject, server_body)
-    background_tasks.add_task(send_email, payload.email, confirmation_subject, confirmation_body)
+    # 1) Envío **sincronizado** de la confirmación al cliente
+    try:
+        _send_email_raw(payload.email, confirmation_subject, confirmation_body)
+        logger.info(f"Confirmación enviada a {payload.email}")
+    except Exception as e:
+        logger.error(f"Error enviando confirmación a {payload.email}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo enviar la confirmación al cliente"
+        )
 
-    return {"message": "Emails en proceso de envío"}
+    # 2) Envío en segundo plano al servidor
+    background_tasks.add_task(
+        send_email_background,
+        TU_EMAIL,
+        server_subject,
+        server_body
+    )
+
+    return {"message": "Confirmación enviada. Tu solicitud ha sido recibida."}
