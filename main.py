@@ -120,8 +120,8 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
             <p style="margin: 15px 0 5px 0; font-weight: bold; color: {COLORS['highlight']};">Mensaje:</p>
             <p style="margin: 0; color: #333; line-height: 1.4;">{escaped_message}</p>
           </div>
-          <a href="#" style="display: inline-block; text-decoration: none; background-color: {COLORS['highlight']}; color: #fff; padding: 10px 20px; border-radius: 6px; font-weight: bold;">Volver al portfolio</a>
-          <p style="margin-top: 20px; font-size: 12px; color: #999;">¡Gracias por contactar! | All‑in</p>
+          <a href="https://all-in-dev.vercel.app" style="display: inline-block; text-decoration: none; background-color: {COLORS['highlight']}; color: #fff; padding: 10px 20px; border-radius: 6px; font-weight: bold;">All-in</a>
+          <p style="margin-top: 20px; font-size: 12px; color: #999;">¡Gracias por contactar!</p>
         </div>
         """
     else:
@@ -137,8 +137,8 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
             <p style="margin: 15px 0 5px 0; font-weight: bold; color: {COLORS['highlight']};">Message:</p>
             <p style="margin: 0; color: #333; line-height: 1.4;">{escaped_message}</p>
           </div>
-          <a href="#" style="display: inline-block; text-decoration: none; background-color: {COLORS['highlight']}; color: #fff; padding: 10px 20px; border-radius: 6px; font-weight: bold;">Back to portfolio</a>
-          <p style="margin-top: 20px; font-size: 12px; color: #999;">Thanks for reaching out! | All‑in</p>
+          <a href="https://all-in-dev.vercel.app/" style="display: inline-block; text-decoration: none; background-color: {COLORS['highlight']}; color: #fff; padding: 10px 20px; border-radius: 6px; font-weight: bold;">All-in</a>
+          <p style="margin-top: 20px; font-size: 12px; color: #999;">Thanks for reaching out!</p>
         </div>
         """
 
