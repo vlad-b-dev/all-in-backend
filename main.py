@@ -10,16 +10,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- Logging básico ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# CORS para conectar desde tu frontend en Vercel
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Ajusta a tu dominio Vercel si lo deseas
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,39 +63,36 @@ def send_email_background(to_email: str, subject: str, body: str):
 
 @app.post("/contact")
 async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
-    # Validación básica de email
     if "@" not in payload.email:
         raise HTTPException(status_code=400, detail="Email inválido")
 
     lang = payload.lang.lower()
-    # Asunto y cuerpo para tu bandeja
     server_subject = f"All-in Request - {payload.subject}"
     server_body = (
         f"{'Nuevo mensaje' if lang=='es' else 'New message'} de "
-        f"{payload.name} ({payload.email}):\n\n{payload.message}"
+        f"{payload.name} ({payload.email}):\n\n{payload.subject}\n\n{payload.message}"
     )
 
     # Asunto y cuerpo para confirmación al cliente
     if lang == "es":
         confirmation_subject = f"Mensaje recibido: {payload.subject}"
         confirmation_body = (
-            f"Hola {payload.name},\n\n"
+            f"¡Hola {payload.name}!\n\n"
             "Hemos recibido tu mensaje:\n\n"
-            f"\"Asunto\": \"{payload.subject}\"\n"
-            f"\"Mensaje\": \"{payload.message}\"\n\n"
-            "¡En breve contactaremos contigo! - All-in"
+            f"{payload.subject}\n\n"
+            f"{payload.message}\n\n"
+            "¡En breve contactaremos contigo! | All-in"
         )
     else:
         confirmation_subject = f"Contact Confirmation: {payload.subject}"
         confirmation_body = (
-            f"Hi {payload.name},\n\n"
+            f"Hi {payload.name}!\n\n"
             "We have received your message:\n\n"
-            f"\"Subject\": \"{payload.subject}\"\n"
-            f"\"Message\": \"{payload.message}\"\n\n"
-            "We will contact you soon! - All-in"
+            f"{payload.subject}\n\n"
+            f"{payload.message}\n\n"
+            "We will contact you soon! | All-in"
         )
 
-    # 1) Envío **sincronizado** de la confirmación al cliente
     try:
         _send_email_raw(payload.email, confirmation_subject, confirmation_body)
         logger.info(f"Confirmación enviada a {payload.email}")
@@ -108,7 +103,6 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
             detail="No se pudo enviar la confirmación al cliente"
         )
 
-    # 2) Envío en segundo plano al servidor
     background_tasks.add_task(
         send_email_background,
         TU_EMAIL,
