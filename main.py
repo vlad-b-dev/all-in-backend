@@ -38,13 +38,13 @@ class ContactRequest(BaseModel):
     lang: str = "en"
 
 
-def _send_email_raw(to_email: str, subject: str, body: str):
+def _send_email_raw(to_email: str, subject: str, body: str, is_html: bool = False):
     """Base: dispara el SMTP y lanza la excepción si falla."""
-    msg = MIMEMultipart()
+    msg = MIMEMultipart("alternative")
     msg["From"] = SMTP_USERNAME
     msg["To"] = to_email
     msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
+    msg.attach(MIMEText(body, "html" if is_html else "plain"))
 
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
         server.starttls()
@@ -52,10 +52,10 @@ def _send_email_raw(to_email: str, subject: str, body: str):
         server.send_message(msg)
 
 
-def send_email_background(to_email: str, subject: str, body: str):
+def send_email_background(to_email: str, subject: str, body: str, is_html: bool = False):
     """Para tareas en background: atrapa errores y los loggea."""
     try:
-        _send_email_raw(to_email, subject, body)
+        _send_email_raw(to_email, subject, body, is_html)
         logger.info(f"[BG] Email enviado a {to_email} con asunto '{subject}'")
     except Exception as e:
         logger.error(f"[BG] Error enviando a {to_email}: {e}")
@@ -68,33 +68,74 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
 
     lang = payload.lang.lower()
     server_subject = f"All-in Request - {payload.subject}"
-    server_body = (
-        f"{'Nuevo mensaje' if lang=='es' else 'New message'} de "
-        f"{payload.name} ({payload.email}):\n\n{payload.subject}\n\n{payload.message}"
-    )
 
-    # Asunto y cuerpo para confirmación al cliente
+    # ---- Rich HTML layout for admin notification ----
+    server_body = f"""
+    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.4;">
+      <h2 style="margin-bottom: 0.5em;">
+        {'📬 Nuevo mensaje recibido' if lang=='es' else '📬 New Message Received'}
+      </h2>
+      <table style="width: 100%; border-collapse: collapse; margin-top: 1em;">
+        <tr>
+          <td style="padding: 8px; font-weight: bold; width: 120px;">{ 'Nombre' if lang=='es' else 'Name' }:</td>
+          <td style="padding: 8px;">{payload.name}</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+          <td style="padding: 8px; font-weight: bold;">Email:</td>
+          <td style="padding: 8px;">{payload.email}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; font-weight: bold;">{ 'Asunto' if lang=='es' else 'Subject' }:</td>
+          <td style="padding: 8px;">{payload.subject}</td>
+        </tr>
+        <tr style="background: #f9f9f9;">
+          <td style="padding: 8px; font-weight: bold; vertical-align: top;">{ 'Mensaje' if lang=='es' else 'Message' }:</td>
+          <td style="padding: 8px;">{payload.message.replace('\\n', '<br>')}</td>
+        </tr>
+      </table>
+      <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
+        { 'Enviado desde tu portafolio All‑in' if lang=='es' else 'Sent from your All‑in portfolio' }
+      </p>
+    </div>
+    """
+
+    # ---- Rich HTML layout for client confirmation ----
     if lang == "es":
         confirmation_subject = f"Mensaje recibido: {payload.subject}"
-        confirmation_body = (
-            f"¡Hola {payload.name}!\n\n"
-            "Hemos recibido tu mensaje:\n\n"
-            f"{payload.subject}\n\n"
-            f"{payload.message}\n\n"
-            "¡En breve contactaremos contigo! | All-in"
-        )
+        confirmation_body = f"""
+        <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
+          <h2 style="color: #2a7ae2; margin-bottom: 0.5em;">✅ Confirmación de recibido</h2>
+          <p>¡Hola {payload.name}!</p>
+          <p><strong>Hemos recibido tu mensaje</strong> y estaremos en contacto contigo pronto.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 1em 0;" />
+          <p><strong>Asunto:</strong> {payload.subject}</p>
+          <p><strong>Mensaje:</strong></p>
+          <p style="margin-left:1em; color: #555;">{payload.message.replace('\\n', '<br>')}</p>
+          <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
+            Gracias por escribirnos. | All‑in
+          </p>
+        </div>
+        """
     else:
         confirmation_subject = f"Contact Confirmation: {payload.subject}"
-        confirmation_body = (
-            f"Hi {payload.name}!\n\n"
-            "We have received your message:\n\n"
-            f"{payload.subject}\n\n"
-            f"{payload.message}\n\n"
-            "We will contact you soon! | All-in"
-        )
+        confirmation_body = f"""
+        <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
+          <h2 style="color: #2a7ae2; margin-bottom: 0.5em;">✅ Your message has been received</h2>
+          <p>Hi {payload.name},</p>
+          <p><strong>We have received your message</strong> and will get back to you soon.</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 1em 0;" />
+          <p><strong>Subject:</strong> {payload.subject}</p>
+          <p><strong>Message:</strong></p>
+          <p style="margin-left:1em; color: #555;">{payload.message.replace('\\n', '<br>')}</p>
+          <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
+            Thanks for reaching out! | All‑in
+          </p>
+        </div>
+        """
 
+    # Send confirmation email as HTML
     try:
-        _send_email_raw(payload.email, confirmation_subject, confirmation_body)
+        _send_email_raw(payload.email, confirmation_subject, confirmation_body, is_html=True)
         logger.info(f"Confirmación enviada a {payload.email}")
     except Exception as e:
         logger.error(f"Error enviando confirmación a {payload.email}: {e}")
@@ -103,11 +144,13 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
             detail="No se pudo enviar la confirmación al cliente"
         )
 
+    # Send admin notification in background as HTML
     background_tasks.add_task(
         send_email_background,
         TU_EMAIL,
         server_subject,
-        server_body
+        server_body,
+        True
     )
 
     return {"message": "Confirmación enviada. Tu solicitud ha sido recibida."}
