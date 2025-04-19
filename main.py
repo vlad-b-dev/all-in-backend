@@ -69,10 +69,8 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
     lang = payload.lang.lower()
     server_subject = f"All-in Request - {payload.subject}"
 
-    # Prepare HTML-safe message (no backslashes inside f-strings)
     html_message = payload.message.replace("\n", "<br>")
 
-    # ---- Rich HTML layout for admin notification ----
     server_body = f"""
     <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.4;">
       <h2 style="margin-bottom: 0.5em;">
@@ -107,7 +105,7 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
         confirmation_subject = f"Mensaje recibido: {payload.subject}"
         confirmation_body = f"""
         <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
-          <h2 style="color: #2a7ae2; margin-bottom: 0.5em;">✅ Confirmación de recibido</h2>
+          <h2 style="color: #2a7ae2; margin-bottom: 0.5em;">✅ Mensaje de recibido</h2>
           <p>¡Hola {payload.name}!</p>
           <p><strong>Hemos recibido tu mensaje</strong> y estaremos en contacto contigo pronto.</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 1em 0;" />
@@ -115,7 +113,7 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
           <p><strong>Mensaje:</strong></p>
           <p style="margin-left:1em; color: #555;">{html_message}</p>
           <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
-            Gracias por escribirnos. | All‑in
+            ¡Gracias por contactar! | All‑in
           </p>
         </div>
         """
