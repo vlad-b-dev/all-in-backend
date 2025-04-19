@@ -30,7 +30,6 @@ SMTP_USERNAME = os.getenv("SMTP_USERNAME")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
 TU_EMAIL = os.getenv("TU_EMAIL")
 
-
 class ContactRequest(BaseModel):
     name: str
     email: str
@@ -38,7 +37,7 @@ class ContactRequest(BaseModel):
     subject: str = "Consulta desde tu portafolio"
     lang: str = "en"
 
-
+# Paleta de colores
 COLORS = {
     "main": "#efc847",
     "hover": "#181818",
@@ -47,9 +46,7 @@ COLORS = {
     "bg_secondary": "#ffffff",
 }
 
-
 def _send_email_raw(to_email: str, subject: str, body: str, is_html: bool = False):
-    """Base: dispara el SMTP y lanza la excepción si falla."""
     msg = MIMEMultipart("alternative")
     msg["From"] = SMTP_USERNAME
     msg["To"] = to_email
@@ -61,15 +58,12 @@ def _send_email_raw(to_email: str, subject: str, body: str, is_html: bool = Fals
         server.login(SMTP_USERNAME, SMTP_PASSWORD)
         server.send_message(msg)
 
-
 def send_email_background(to_email: str, subject: str, body: str, is_html: bool = False):
-    """Para tareas en background: atrapa errores y los loggea."""
     try:
         _send_email_raw(to_email, subject, body, is_html)
         logger.info(f"[BG] Email enviado a {to_email} con asunto '{subject}'")
     except Exception as e:
         logger.error(f"[BG] Error enviando a {to_email}: {e}")
-
 
 @app.post("/contact")
 async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
@@ -79,9 +73,10 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
     lang = payload.lang.lower()
     server_subject = f"All-in Request - {payload.subject}"
 
-    # Escapar los mensajes para evitar que se rompa el HTML
+    # Escapar el mensaje para evitar inyección HTML
     escaped_message = html.escape(payload.message).replace("\n", "<br>")
 
+    # Cuerpo del email al administrador
     server_body = f"""
     <div style="font-family: Arial, sans-serif; background-color: {COLORS['bg_main']}; padding: 20px; border-radius: 10px;">
       <h2 style="margin-bottom: 0.5em; color: {COLORS['highlight']};">
@@ -111,41 +106,43 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
     </div>
     """
 
-    # ---- Rich HTML layout para confirmación al cliente ----
+    # Cuerpo del email de confirmación al cliente (mejorado con estilo vibrante)
     if lang == "es":
         confirmation_subject = f"Mensaje recibido: {payload.subject}"
         confirmation_body = f"""
-        <div style="font-family: Arial, sans-serif; background-color: {COLORS['bg_main']}; padding: 20px; border-radius: 10px;">
-          <h2 style="color: {COLORS['highlight']}; margin-bottom: 0.5em;">✅ Mensaje recibido</h2>
-          <p>¡Hola {payload.name}!</p>
-          <p><strong>Hemos recibido tu mensaje</strong> y estaremos en contacto contigo pronto.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 1em 0;" />
-          <p><strong>Asunto:</strong> {payload.subject}</p>
-          <p><strong>Mensaje:</strong></p>
-          <p style="margin-left:1em; color: #555;">{escaped_message}</p>
-          <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
-            ¡Gracias por contactar! | All‑in
-          </p>
+        <div style="font-family: Arial, sans-serif; background-color: {COLORS['bg_secondary']}; padding: 30px; border-radius: 12px; border: 2px solid {COLORS['main']}; max-width: 600px; margin: auto;">
+          <h1 style="color: {COLORS['main']}; margin-bottom: 0.5em; font-size: 24px;">✅ Mensaje recibido</h1>
+          <p style="font-size: 16px; color: #333;">¡Hola <strong>{payload.name}</strong>!</p>
+          <p style="font-size: 14px; color: #555; line-height: 1.5;"><strong>Hemos recibido tu mensaje</strong> y nos pondremos en contacto contigo pronto.</p>
+          <div style="margin: 20px 0; padding: 15px; background-color: {COLORS['bg_main']}; border-radius: 8px;">
+            <p style="margin: 0; font-weight: bold; color: {COLORS['highlight']};">Asunto:</p>
+            <p style="margin: 5px 0 0 0; color: #333;">{payload.subject}</p>
+            <p style="margin: 15px 0 5px 0; font-weight: bold; color: {COLORS['highlight']};">Mensaje:</p>
+            <p style="margin: 0; color: #333; line-height: 1.4;">{escaped_message}</p>
+          </div>
+          <a href="#" style="display: inline-block; text-decoration: none; background-color: {COLORS['highlight']}; color: #fff; padding: 10px 20px; border-radius: 6px; font-weight: bold;">Volver al portfolio</a>
+          <p style="margin-top: 20px; font-size: 12px; color: #999;">¡Gracias por contactar! | All‑in</p>
         </div>
         """
     else:
         confirmation_subject = f"Contact Confirmation: {payload.subject}"
         confirmation_body = f"""
-        <div style="font-family: Arial, sans-serif; background-color: {COLORS['bg_main']}; padding: 20px; border-radius: 10px;">
-          <h2 style="color: {COLORS['highlight']}; margin-bottom: 0.5em;">✅ Your message has been received</h2>
-          <p>Hi {payload.name},</p>
-          <p><strong>We have received your message</strong> and will get back to you soon.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 1em 0;" />
-          <p><strong>Subject:</strong> {payload.subject}</p>
-          <p><strong>Message:</strong></p>
-          <p style="margin-left:1em; color: #555;">{escaped_message}</p>
-          <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
-            Thanks for reaching out! | All‑in
-          </p>
+        <div style="font-family: Arial, sans-serif; background-color: {COLORS['bg_secondary']}; padding: 30px; border-radius: 12px; border: 2px solid {COLORS['main']}; max-width: 600px; margin: auto;">
+          <h1 style="color: {COLORS['main']}; margin-bottom: 0.5em; font-size: 24px;">✅ Your message has been received</h1>
+          <p style="font-size: 16px; color: #333;">Hi <strong>{payload.name}</strong>,</p>
+          <p style="font-size: 14px; color: #555; line-height: 1.5;"><strong>We have received your message</strong> and will get back to you soon.</p>
+          <div style="margin: 20px 0; padding: 15px; background-color: {COLORS['bg_main']}; border-radius: 8px;">
+            <p style="margin: 0; font-weight: bold; color: {COLORS['highlight']};">Subject:</p>
+            <p style="margin: 5px 0 0 0; color: #333;">{payload.subject}</p>
+            <p style="margin: 15px 0 5px 0; font-weight: bold; color: {COLORS['highlight']};">Message:</p>
+            <p style="margin: 0; color: #333; line-height: 1.4;">{escaped_message}</p>
+          </div>
+          <a href="#" style="display: inline-block; text-decoration: none; background-color: {COLORS['highlight']}; color: #fff; padding: 10px 20px; border-radius: 6px; font-weight: bold;">Back to portfolio</a>
+          <p style="margin-top: 20px; font-size: 12px; color: #999;">Thanks for reaching out! | All‑in</p>
         </div>
         """
 
-    # Envío de confirmación al cliente
+    # Enviar confirmación al cliente
     try:
         _send_email_raw(payload.email, confirmation_subject, confirmation_body, is_html=True)
         logger.info(f"Confirmación enviada a {payload.email}")
@@ -156,7 +153,7 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
             detail="No se pudo enviar la confirmación al cliente"
         )
 
-    # Notificación a admin en background
+    # Notificación al admin en background
     background_tasks.add_task(
         send_email_background,
         TU_EMAIL,
