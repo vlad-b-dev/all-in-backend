@@ -7,6 +7,7 @@ from email.mime.multipart import MIMEMultipart
 import os
 import logging
 from dotenv import load_dotenv
+import html
 
 load_dotenv()
 
@@ -36,6 +37,15 @@ class ContactRequest(BaseModel):
     message: str
     subject: str = "Consulta desde tu portafolio"
     lang: str = "en"
+
+
+COLORS = {
+    "main": "#efc847",
+    "hover": "#181818",
+    "highlight": "#0057d9",
+    "bg_main": "#d6d6d6",
+    "bg_secondary": "#ffffff",
+}
 
 
 def _send_email_raw(to_email: str, subject: str, body: str, is_html: bool = False):
@@ -69,29 +79,30 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
     lang = payload.lang.lower()
     server_subject = f"All-in Request - {payload.subject}"
 
-    html_message = payload.message.replace("\n", "<br>")
+    # Escapar los mensajes para evitar que se rompa el HTML
+    escaped_message = html.escape(payload.message).replace("\n", "<br>")
 
     server_body = f"""
-    <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.4;">
-      <h2 style="margin-bottom: 0.5em;">
+    <div style="font-family: Arial, sans-serif; background-color: {COLORS['bg_main']}; padding: 20px; border-radius: 10px;">
+      <h2 style="margin-bottom: 0.5em; color: {COLORS['highlight']};">
         {'📬 Nuevo mensaje recibido' if lang=='es' else '📬 New Message Received'}
       </h2>
-      <table style="width: 100%; border-collapse: collapse; margin-top: 1em;">
+      <table style="width: 100%; border-collapse: collapse; margin-top: 1em; background-color: {COLORS['bg_secondary']}; border-radius: 8px;">
         <tr>
-          <td style="padding: 8px; font-weight: bold; width: 120px;">{ 'Nombre' if lang=='es' else 'Name' }:</td>
-          <td style="padding: 8px;">{payload.name}</td>
+          <td style="padding: 8px; font-weight: bold; width: 120px; color: {COLORS['main']};">{ 'Nombre' if lang=='es' else 'Name' }:</td>
+          <td style="padding: 8px; color: #333;">{payload.name}</td>
         </tr>
         <tr style="background: #f9f9f9;">
-          <td style="padding: 8px; font-weight: bold;">Email:</td>
-          <td style="padding: 8px;">{payload.email}</td>
+          <td style="padding: 8px; font-weight: bold; color: {COLORS['main']};">Email:</td>
+          <td style="padding: 8px; color: #333;">{payload.email}</td>
         </tr>
         <tr>
-          <td style="padding: 8px; font-weight: bold;">{ 'Asunto' if lang=='es' else 'Subject' }:</td>
-          <td style="padding: 8px;">{payload.subject}</td>
+          <td style="padding: 8px; font-weight: bold; color: {COLORS['main']};">{ 'Asunto' if lang=='es' else 'Subject' }:</td>
+          <td style="padding: 8px; color: #333;">{payload.subject}</td>
         </tr>
         <tr style="background: #f9f9f9;">
-          <td style="padding: 8px; font-weight: bold; vertical-align: top;">{ 'Mensaje' if lang=='es' else 'Message' }:</td>
-          <td style="padding: 8px;">{html_message}</td>
+          <td style="padding: 8px; font-weight: bold; color: {COLORS['main']}; vertical-align: top;">{ 'Mensaje' if lang=='es' else 'Message' }:</td>
+          <td style="padding: 8px; color: #333;">{escaped_message}</td>
         </tr>
       </table>
       <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
@@ -100,18 +111,18 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
     </div>
     """
 
-    # ---- Rich HTML layout for client confirmation ----
+    # ---- Rich HTML layout para confirmación al cliente ----
     if lang == "es":
         confirmation_subject = f"Mensaje recibido: {payload.subject}"
         confirmation_body = f"""
-        <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
-          <h2 style="color: #2a7ae2; margin-bottom: 0.5em;">✅ Mensaje de recibido</h2>
+        <div style="font-family: Arial, sans-serif; background-color: {COLORS['bg_main']}; padding: 20px; border-radius: 10px;">
+          <h2 style="color: {COLORS['highlight']}; margin-bottom: 0.5em;">✅ Mensaje recibido</h2>
           <p>¡Hola {payload.name}!</p>
           <p><strong>Hemos recibido tu mensaje</strong> y estaremos en contacto contigo pronto.</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 1em 0;" />
           <p><strong>Asunto:</strong> {payload.subject}</p>
           <p><strong>Mensaje:</strong></p>
-          <p style="margin-left:1em; color: #555;">{html_message}</p>
+          <p style="margin-left:1em; color: #555;">{escaped_message}</p>
           <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
             ¡Gracias por contactar! | All‑in
           </p>
@@ -120,21 +131,21 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
     else:
         confirmation_subject = f"Contact Confirmation: {payload.subject}"
         confirmation_body = f"""
-        <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.5;">
-          <h2 style="color: #2a7ae2; margin-bottom: 0.5em;">✅ Your message has been received</h2>
+        <div style="font-family: Arial, sans-serif; background-color: {COLORS['bg_main']}; padding: 20px; border-radius: 10px;">
+          <h2 style="color: {COLORS['highlight']}; margin-bottom: 0.5em;">✅ Your message has been received</h2>
           <p>Hi {payload.name},</p>
           <p><strong>We have received your message</strong> and will get back to you soon.</p>
           <hr style="border: none; border-top: 1px solid #eee; margin: 1em 0;" />
           <p><strong>Subject:</strong> {payload.subject}</p>
           <p><strong>Message:</strong></p>
-          <p style="margin-left:1em; color: #555;">{html_message}</p>
+          <p style="margin-left:1em; color: #555;">{escaped_message}</p>
           <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
             Thanks for reaching out! | All‑in
           </p>
         </div>
         """
 
-    # Send confirmation email as HTML
+    # Envío de confirmación al cliente
     try:
         _send_email_raw(payload.email, confirmation_subject, confirmation_body, is_html=True)
         logger.info(f"Confirmación enviada a {payload.email}")
@@ -145,7 +156,7 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
             detail="No se pudo enviar la confirmación al cliente"
         )
 
-    # Send admin notification in background as HTML
+    # Notificación a admin en background
     background_tasks.add_task(
         send_email_background,
         TU_EMAIL,
