@@ -17,7 +17,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,6 +69,9 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
     lang = payload.lang.lower()
     server_subject = f"All-in Request - {payload.subject}"
 
+    # Prepare HTML-safe message (no backslashes inside f-strings)
+    html_message = payload.message.replace("\n", "<br>")
+
     # ---- Rich HTML layout for admin notification ----
     server_body = f"""
     <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.4;">
@@ -90,7 +93,7 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
         </tr>
         <tr style="background: #f9f9f9;">
           <td style="padding: 8px; font-weight: bold; vertical-align: top;">{ 'Mensaje' if lang=='es' else 'Message' }:</td>
-          <td style="padding: 8px;">{payload.message.replace('\\n', '<br>')}</td>
+          <td style="padding: 8px;">{html_message}</td>
         </tr>
       </table>
       <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
@@ -110,7 +113,7 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
           <hr style="border: none; border-top: 1px solid #eee; margin: 1em 0;" />
           <p><strong>Asunto:</strong> {payload.subject}</p>
           <p><strong>Mensaje:</strong></p>
-          <p style="margin-left:1em; color: #555;">{payload.message.replace('\\n', '<br>')}</p>
+          <p style="margin-left:1em; color: #555;">{html_message}</p>
           <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
             Gracias por escribirnos. | All‑in
           </p>
@@ -126,7 +129,7 @@ async def contact(payload: ContactRequest, background_tasks: BackgroundTasks):
           <hr style="border: none; border-top: 1px solid #eee; margin: 1em 0;" />
           <p><strong>Subject:</strong> {payload.subject}</p>
           <p><strong>Message:</strong></p>
-          <p style="margin-left:1em; color: #555;">{payload.message.replace('\\n', '<br>')}</p>
+          <p style="margin-left:1em; color: #555;">{html_message}</p>
           <p style="margin-top: 1.5em; font-size: 0.9em; color: #666;">
             Thanks for reaching out! | All‑in
           </p>
